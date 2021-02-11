@@ -70,16 +70,14 @@ namespace streaming {
         }
 
         StreamingTpkt( uint32_t restDataLen, cmd::Id command, const std::string& str )
-            : Tpkt( str.size()+4+restDataLen, PROTOCOL_VERSION, command )
+            : Tpkt( uint32_t(str.size()+4+restDataLen), PROTOCOL_VERSION, command )
         {
-            writeUint32( str.size() );
-            writeBytes( (const uint8_t*) str.c_str(), str.size() );
+            writeBytes( (const uint8_t*) str.c_str(), (uint32_t)str.size() );
         }
 
         StreamingTpkt( uint32_t restDataLen, cmd::Id command, uint8_t* ptr, uint32_t binDataLen )
             : Tpkt( binDataLen+4+restDataLen, PROTOCOL_VERSION, command )
         {
-            writeUint32( binDataLen );
             writeBytes( ptr, binDataLen );
         }
 
@@ -156,7 +154,7 @@ namespace streaming {
                 throw std::runtime_error("invalid packet size");
 
             str.reserve( lenght );
-            str.append( m_readPosition, m_readPosition+lenght );
+            str.assign( m_readPosition, m_readPosition+lenght );
             m_readPosition += lenght;
         }
 

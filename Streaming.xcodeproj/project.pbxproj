@@ -29,7 +29,6 @@
 /* Begin PBXFileReference section */
 		FA548BA425D4843600F30AA5 /* test.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test.cpp; sourceTree = "<group>"; };
 		FA9DAC5A25CB607000E91C68 /* Streaming */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Streaming; sourceTree = BUILT_PRODUCTS_DIR; };
-		FA9DAC6D25CB60EE00E91C68 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		FA9DAC9925D2209100E91C68 /* AsyncTcpServer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AsyncTcpServer.cpp; sourceTree = "<group>"; };
 		FA9DAC9A25D2209100E91C68 /* Tpkt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Tpkt.h; sourceTree = "<group>"; };
 		FA9DAC9B25D2209100E91C68 /* TcpClient.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TcpClient.cpp; sourceTree = "<group>"; };
@@ -59,7 +58,6 @@
 			children = (
 				FA9DAC9825D2209100E91C68 /* net */,
 				FA9DAC9E25D2209B00E91C68 /* streaming */,
-				FA9DAC6D25CB60EE00E91C68 /* main.cpp */,
 				FA548BA425D4843600F30AA5 /* test.cpp */,
 				FA9DAC5B25CB607000E91C68 /* Products */,
 			);

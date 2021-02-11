@@ -42,11 +42,13 @@ class ViewerSession: std::enable_shared_from_this<ViewerSession>
     friend class StreamerSession;
 
     // Tcp session
-    IAsyncTcpSession*  m_tcpSession;
+    IAsyncTcpSession*   m_tcpSession;
+    std::mutex          m_readMutex;
+    std::mutex          m_writeMutex;
 
     // Back reference to streamer (its owner)
-    IStreamerSession&  m_streamerSession;
-    StreamingTpkt      m_response;
+    IStreamerSession&   m_streamerSession;
+    StreamingTpkt       m_response;
 
 public:
 
@@ -58,11 +60,15 @@ public:
 
     ~ViewerSession()
     {
+        m_tcpSession->closeSession();
+        m_writeMutex.lock();
+        m_readMutex.lock();
         delete  m_tcpSession;
     }
 
     void readNextClientRequest()
     {
+        m_readMutex.lock();
         m_tcpSession->asyncRead( [this]()
         {
             if ( m_tcpSession->hasError() )
@@ -71,12 +77,12 @@ public:
 
                 StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->errorMassage() );
                 m_tcpSession->closeSession();
-                delete m_tcpSession;
-                m_tcpSession = nullptr;
                 //TODO remove(this);
+                m_readMutex.unlock();
                 return;
             }
             //TODO
+            m_readMutex.unlock();
 
 //            try {
 
@@ -105,32 +111,32 @@ public:
             m_response.init( 0, cmd::IS_NOT_STARTED_RESPONSE );
         }
          
+        m_writeMutex.lock();
         m_tcpSession->asyncWrite( m_response, [this]
         {
             if ( m_tcpSession->hasError() )
             {
                 LOG_ERR( "ViewerSession asyncWrite error: " << m_tcpSession->errorMassage() << std::endl );
                 m_tcpSession->closeSession();
-                delete m_tcpSession;
-                m_tcpSession = nullptr;
+                m_writeMutex.unlock();
                 return;
             }
+            m_writeMutex.unlock();
             readNextClientRequest();
         });
     }
 
     void sendStreamingData( StreamingTpkt& packet )
     {
+        m_writeMutex.lock();
         m_tcpSession->asyncWrite( packet, [this]
         {
             if ( m_tcpSession->hasError() )
             {
                 LOG_ERR( "sendStreamingData:asyncWrite error: " << m_tcpSession->errorMassage() << std::endl );
                 m_tcpSession->closeSession();
-                delete m_tcpSession;
-                m_tcpSession = nullptr;
-                return;
             }
+            m_writeMutex.unlock();
         });
     }
 };
@@ -165,10 +171,14 @@ public:
           m_tcpSession(session),
           m_endSessionHandler(endSessionHandler)
     {
+        LOG( "StreamerSession: " << m_streamId.m_id << std::endl );
     }
 
     ~StreamerSession()
     {
+        LOG( "~StreamerSession: " << m_streamId.m_id << std::endl );
+        if ( m_tcpSession != nullptr )
+            m_tcpSession->closeSession();
         delete m_tcpSession;
     }
 
@@ -458,11 +468,6 @@ public:
     void handleEndStreamingSession( StreamId& streamId )
     {
         auto& session = m_liveStreamMap[streamId];
-
-        if ( session->m_tcpSession != nullptr )
-            session->m_tcpSession->closeSession();
-        delete session->m_tcpSession;
-
         m_liveStreamMap.erase( streamId );
 
     }
