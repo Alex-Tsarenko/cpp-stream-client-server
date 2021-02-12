@@ -203,11 +203,9 @@ public:
     void startAccept()
     {
         std::shared_ptr<IAsyncTcpSession> newSession = std::make_shared<AsyncTcpSession>( tcp::socket(m_context) );
-        auto weak = std::weak_ptr<IAsyncTcpSession>(newSession);
         m_acceptor->async_accept( ((AsyncTcpSession*)newSession.get())->m_socket,
                                  [newSession,this] ( const boost::system::error_code& ec )
         {
-            auto weak = std::weak_ptr<IAsyncTcpSession>(newSession);
             if (!ec)
             {
                 m_newSessionHandler( newSession );
@@ -218,24 +216,6 @@ public:
             }
             startAccept();
         });
-//            boost::bind( &AsyncTcpServer::handleAccept, this, newSession,
-//              boost::asio::placeholders::error));
-    }
-
-    void handleAccept( std::shared_ptr<IAsyncTcpSession> newSession, const boost::system::error_code& ec )
-    {
-        if ( !ec )
-        {
-            m_newSessionHandler( newSession );
-        }
-        else
-        {
-            //TODO log socket error
-            //delete newSession;
-        }
-
-        // run 'startAccept' again
-        startAccept();
     }
 };
 
