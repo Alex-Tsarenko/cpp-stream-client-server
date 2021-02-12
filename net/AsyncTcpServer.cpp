@@ -32,12 +32,12 @@ private:
 public:
     AsyncTcpSession( tcp::socket&& socket ) : m_socket( std::move(socket) )
     {
-        LOG( "TcpSession()" << std::endl );
+        LOG( "TcpSession(" << this << ")" << std::endl );
     }
 
     virtual ~AsyncTcpSession()
     {
-        LOG( "~TcpSession()" << std::endl );
+        LOG( "~TcpSession(" << this << ")" << std::endl );
     }
 
     TpktRcv&    request()               override { return m_request; }
@@ -49,66 +49,81 @@ protected:
     void asyncWrite( Tpkt& response, std::function<void()> func ) override
     {
         response.updatePacketLenght();
+
         //LOG( "async_write: response.lenght():" << response.lenght() << std::endl );
+
+        auto weak = std::weak_ptr<IAsyncTcpSession>( ((IAsyncTcpSession*)this)->shared_from_this() );
         asio::async_write( m_socket, asio::buffer( response.ptr(), response.lenght() ),
                 [=]( boost::system::error_code ec, std::size_t /*bytesTransfered*/ )
         {
-            m_lastErrorCode = ec;
-            if ( ec )
-            {
-                logSocketError();
-            }
-            func();
-        });
-    }
-
-    void asyncRead( std::function<void()> func ) override
-    {
-        //asio::read( m_socket, asio::buffer( m_packetLen.bytes, 4 ), asio::transfer_exactly( 4 ) );
-        // Get package lenght        
-        asio::async_read( m_socket, asio::buffer( m_packetLen.bytes, 4 ),
-                          asio::transfer_exactly( 4 ),
-                          [=]( boost::system::error_code ec, std::size_t bytesTransfered )
-        {
-            m_lastErrorCode = ec;
-            if ( ec )
-            {
-                logSocketError();
-                func();
-                return;
-            }
-
-            if ( bytesTransfered != 4 )
-            {
-                handleProtocolError("invalid package lenght");
-                func();
-                return;
-            }
-
-            uint32_t packetLen = m_packetLen.uint32();
-            //LOG( "asyncRead: packetLen: " << packetLen << std::endl );
-
-            if ( packetLen < 8 )
-            {
-                handleProtocolError( "invalid packet size (<8)" );
-                func();
-                return;
-            }
-
-            // Read package data
-            m_request.prepareToRead( packetLen );
-            asio::async_read( m_socket, asio::buffer( m_request.ptr()+4, packetLen-4 ),
-                              asio::transfer_exactly( packetLen ),
-                              [=]( boost::system::error_code ec, std::size_t bytesTransfered )
+            if ( auto shared = weak.lock(); shared )
             {
                 m_lastErrorCode = ec;
                 if ( ec )
                 {
                     logSocketError();
                 }
-
                 func();
-            });
+            }
+        });
+    }
+
+    void asyncRead( std::function<void()> func ) override
+    {
+        LOG( "asyncRead(" << this << ")" << std::endl );
+
+        // Get package lenght
+        auto weak = std::weak_ptr<IAsyncTcpSession>( ((IAsyncTcpSession*)this)->shared_from_this() );
+        asio::async_read( m_socket, asio::buffer( m_packetLen.bytes, 4 ),
+                          asio::transfer_exactly( 4 ),
+                          [=]( boost::system::error_code ec, std::size_t bytesTransfered )
+        {
+            if ( auto shared = weak.lock(); shared )
+            {
+                m_lastErrorCode = ec;
+                if ( ec )
+                {
+                    logSocketError();
+                    func();
+                    return;
+                }
+
+                if ( bytesTransfered != 4 )
+                {
+                    handleProtocolError("invalid package lenght");
+                    func();
+                    return;
+                }
+
+                uint32_t packetLen = m_packetLen.uint32();
+                //LOG( "asyncRead: packetLen: " << packetLen << std::endl );
+
+                if ( packetLen < 8 )
+                {
+                    handleProtocolError( "invalid packet size (<8)" );
+                    func();
+                    return;
+                }
+
+                // Read package data
+                m_request.prepareToRead( packetLen );
+                auto weak = std::weak_ptr<IAsyncTcpSession>( ((IAsyncTcpSession*)this)->shared_from_this() );
+                asio::async_read( m_socket, asio::buffer( m_request.ptr()+4, packetLen-4 ),
+                                  asio::transfer_exactly( packetLen ),
+                                  [=]( boost::system::error_code ec, std::size_t bytesTransfered )
+                {
+                    if ( auto shared = weak.lock(); shared )
+                    {
+                        m_lastErrorCode = ec;
+                        if ( ec )
+                        {
+                            logSocketError();
+                        }
+
+                        func();
+                    }
+                });
+            }
         });
     }
     
@@ -187,11 +202,12 @@ public:
     // startAccept
     void startAccept()
     {
-        auto newSession = new AsyncTcpSession( tcp::socket(m_context) );
-
-        m_acceptor->async_accept( newSession->m_socket,
+        std::shared_ptr<IAsyncTcpSession> newSession = std::make_shared<AsyncTcpSession>( tcp::socket(m_context) );
+        auto weak = std::weak_ptr<IAsyncTcpSession>(newSession);
+        m_acceptor->async_accept( ((AsyncTcpSession*)newSession.get())->m_socket,
                                  [newSession,this] ( const boost::system::error_code& ec )
         {
+            auto weak = std::weak_ptr<IAsyncTcpSession>(newSession);
             if (!ec)
             {
                 m_newSessionHandler( newSession );
@@ -199,7 +215,6 @@ public:
             else
             {
                 LOG_ERR( "async_accept error: " << ec.message() << std::endl );
-                delete newSession;
             }
             startAccept();
         });
@@ -207,7 +222,7 @@ public:
 //              boost::asio::placeholders::error));
     }
 
-    void handleAccept( AsyncTcpSession* newSession, const boost::system::error_code& ec )
+    void handleAccept( std::shared_ptr<IAsyncTcpSession> newSession, const boost::system::error_code& ec )
     {
         if ( !ec )
         {

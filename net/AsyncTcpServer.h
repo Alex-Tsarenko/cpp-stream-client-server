@@ -7,7 +7,7 @@
 namespace catapult {
 namespace net      {
 
-    class IAsyncTcpSession
+    class IAsyncTcpSession:  public std::enable_shared_from_this<IAsyncTcpSession>
     {
     public:
         virtual void asyncRead( std::function<void()> ) = 0;
@@ -24,7 +24,7 @@ namespace net      {
         virtual ~IAsyncTcpSession() {}
     };
 
-    typedef std::function< void(IAsyncTcpSession*) > NewSessionHandler;
+    typedef std::function< void(std::shared_ptr<IAsyncTcpSession>) > NewSessionHandler;
 
     class IAsyncTcpServer
     {

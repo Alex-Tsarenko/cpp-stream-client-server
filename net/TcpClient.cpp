@@ -26,7 +26,7 @@ public:
     }
     ~TcpClient()
     {
-        LOG( "~TcpClient" << std::endl );
+        LOG( "~TcpClient()" << std::endl );
     }
 
     bool hasError() override

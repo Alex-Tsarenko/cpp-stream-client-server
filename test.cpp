@@ -200,7 +200,6 @@ int main(int, const char * [])
     std::thread s1( [] { runStreamer("Streamer1"); } );
 
     std::thread v1( [] { runViewer("Viewer1"); } );
-//    std::thread v2( [] { runViewer("Viewer2"); } );
 
 
     s1.join();
