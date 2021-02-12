@@ -180,6 +180,7 @@ public:
     // stop
     void stop() override
     {
+        m_acceptor->close();
         m_context.stop();
     }
 

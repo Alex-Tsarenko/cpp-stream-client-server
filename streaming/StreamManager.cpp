@@ -1,4 +1,5 @@
 #include <memory>
+#include <thread>
 #include <set>
 #include <map>
 #include <unordered_set>
@@ -356,7 +357,9 @@ public:
 
     void stopStreamManager() override
     {
+        LOG( "m_liveStreamMap.size()=" << m_liveStreamMap.size() << std::endl );
         m_tcpServer->stop();
+        LOG( "stopStreamManager ended" << std::endl );
     }
 
     void handleNewStreamSession( IAsyncTcpSession* newSession )
@@ -468,8 +471,8 @@ public:
     void handleEndStreamingSession( StreamId& streamId )
     {
         auto& session = m_liveStreamMap[streamId];
-        m_liveStreamMap.erase( streamId );
-
+        //TODO mutex
+        std::thread( [=] { m_liveStreamMap.erase( streamId ); } ).detach();
     }
 
     void handleViewerConnection( StreamId& streamId, IAsyncTcpSession* tcpSession )
