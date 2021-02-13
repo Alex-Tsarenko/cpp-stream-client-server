@@ -33,6 +33,9 @@ public:
     virtual bool isLiveStreamRunning() = 0;
     virtual void addViewer( std::shared_ptr<IAsyncTcpSession> viewerTcpSession ) = 0;
     virtual void removeViewer( std::shared_ptr<ViewerSession> ) = 0;
+
+    virtual void sendErrorResponse( std::string errorText) = 0;
+
 };
 
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -58,12 +61,12 @@ public:
         : m_tcpSession(tcpSession),
           m_streamerSession( std::move(streamerSession) )
     {
-        m_tcpSession->closeSession();
     }
 
     ~ViewerSession()
     {
-        m_tcpSession->closeSession();
+        if ( m_tcpSession )
+            m_tcpSession->closeSession();
     }
 
     void readNextClientRequest()
@@ -236,7 +239,7 @@ public:
         });
     }
 
-    void sendErrorResponse( std::string errorText)
+    void sendErrorResponse( std::string errorText) override
     {
         m_response.init( 0, cmd::ERROR_STREAMING_RESPONSE, errorText );
         m_tcpSession->asyncWrite( m_response, [this]
@@ -461,26 +464,33 @@ public:
 
     void handleStartStreaming( StreamId& streamId, std::shared_ptr<IAsyncTcpSession> tcpSession )
     {
-        const std::lock_guard<std::mutex> autolock( m_liveStreamMutex );
+        m_liveStreamMutex.lock();
 
         auto stream = m_liveStreamMap.find( streamId );
         if ( stream != m_liveStreamMap.end() )
         {
+            m_liveStreamMutex.unlock();
+
             // Have some viewers connected before?
             if ( !stream->second->isLiveStreamRunning() )
             {
                 stream->second->startSession( tcpSession );
                 return;
             }
-            //TODO restore connection to started session
-            // ? delete tcpSession
+
+            //TODO send error message "session already running"
+            //tcpSession->asyncWrite(...)
+
             return;
         }
 
-        // Start/add session
+        // Add session
         EndSessionHandler handler = std::bind( &StreamManager::handleEndStreamingSession, this, std::placeholders::_1);
         std::shared_ptr<IStreamerSession> session = std::make_shared<StreamerSession>( streamId, handler );
         m_liveStreamMap[ streamId ] = session;
+        m_liveStreamMutex.unlock();
+
+        // Start session
         session->startSession( tcpSession );
     }
 

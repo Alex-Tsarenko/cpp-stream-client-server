@@ -40,10 +40,15 @@ public:
     }
 
     bool connect( const std::string& addr, const std::string& port ) override
+    //bool connect( const std::string& addr, int port ) override
     {
+//        auto address = asio::ip::address::from_string( addr );
+//        tcp::endpoint ep( address, port );
+
         tcp::resolver resolver(m_context);
         boost::system::error_code ec;
         boost::asio::connect( m_socket, resolver.resolve(addr, port), ec );
+        //boost::asio::connect( m_socket, resolver.resolve(ep), ec );
 
         if ( ec == boost::system::errc::success )
             return true;
