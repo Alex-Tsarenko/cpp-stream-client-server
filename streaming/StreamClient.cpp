@@ -34,9 +34,13 @@ public:
     }
 
     bool connect( const std::string& addr, const std::string& port ) override
-    //bool connect( const std::string& addr, int port ) override
     {
         return m_tcpClient->connect( addr, port );
+    }
+
+    bool connect( const std::string& addr, int port ) override
+    {
+        return m_tcpClient->connect( addr, std::to_string(port) );
     }
 
     void close() override

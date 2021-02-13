@@ -20,7 +20,7 @@ void runStreamer( std::string streamerId )
     {
         // 1) connect to server
         auto tcpClient = createStreamingClient();
-        if ( !tcpClient->connect( "localhost", PORT_STR ) )
+        if ( !tcpClient->connect( "localhost", PORT ) )
             throw std::runtime_error( tcpClient->errorMessage() );
 
         // send START_STREAMING
@@ -112,7 +112,7 @@ void runViewer( std::string viewerId )
     try {
         // 1) connect
         auto tcpClient = createStreamingClient();
-        if ( !tcpClient->connect( "localhost", PORT_STR ) )
+        if ( !tcpClient->connect( "localhost", PORT ) )
             throw std::runtime_error( tcpClient->errorMessage() );
 
         // send START_LIFE_STREAM_VIEWING

@@ -18,6 +18,7 @@ namespace streaming {
         virtual std::string errorMessage() = 0;
 
         virtual bool connect( const std::string& addr, const std::string& port ) = 0;
+        virtual bool connect( const std::string& addr, int port ) = 0;
         virtual void close() = 0;
 
         virtual bool write( net::Tpkt& ) = 0;
