@@ -17,7 +17,7 @@ namespace net      {
         virtual TpktRcv&    request() = 0;
         virtual bool        hasError()      const = 0;
         virtual bool        isEof()         const = 0;
-        virtual std::string errorMassage()  const = 0;
+        virtual std::string errorMessage()  const = 0;
 
         virtual void closeSession() = 0;
 

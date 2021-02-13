@@ -24,13 +24,15 @@ class StreamManager;
 class ViewerSession;
 
 // IStreamerSession
-class IStreamerSession
+class IStreamerSession: public std::enable_shared_from_this<IStreamerSession>
 {
 public:
     virtual ~IStreamerSession() {}
 
+    virtual void startSession( std::shared_ptr<IAsyncTcpSession> session ) = 0;
     virtual bool isLiveStreamRunning() = 0;
-    virtual void removeViewerSession( ViewerSession* ) = 0;
+    virtual void addViewer( std::shared_ptr<IAsyncTcpSession> viewerTcpSession ) = 0;
+    virtual void removeViewer( std::shared_ptr<ViewerSession> ) = 0;
 };
 
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -46,15 +48,17 @@ class ViewerSession: std::enable_shared_from_this<ViewerSession>
     std::shared_ptr<IAsyncTcpSession>   m_tcpSession;
 
     // Back reference to streamer (its owner)
-    IStreamerSession&   m_streamerSession;
-    StreamingTpkt       m_response;
+    std::weak_ptr<IStreamerSession>     m_streamerSession;
+
+    StreamingTpkt                       m_response; //?
 
 public:
 
-    ViewerSession( std::shared_ptr<IAsyncTcpSession> tcpSession, IStreamerSession& streamerSession )
+    ViewerSession( std::shared_ptr<IAsyncTcpSession> tcpSession, std::weak_ptr<IStreamerSession>&& streamerSession )
         : m_tcpSession(tcpSession),
-          m_streamerSession(streamerSession)
+          m_streamerSession( std::move(streamerSession) )
     {
+        m_tcpSession->closeSession();
     }
 
     ~ViewerSession()
@@ -68,10 +72,13 @@ public:
         {
             if ( m_tcpSession->hasError() )
             {
-                LOG_ERR( "ViewerSession asyncRead error: " << m_tcpSession->errorMassage() << std::endl );
+                LOG_ERR( "ViewerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
 
-                StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->errorMassage() );
-                m_tcpSession->closeSession();
+                StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->errorMessage() );
+                if ( auto shared = m_streamerSession.lock(); shared )
+                {
+                    shared->removeViewer( shared_from_this() );
+                }
                 //TODO remove(this);
                 return;
             }
@@ -95,7 +102,7 @@ public:
     // ViewerSession::sendResponse
     void sendResponse()
     {
-        if ( m_streamerSession.isLiveStreamRunning() )
+        if ( auto shared = m_streamerSession.lock(); shared->isLiveStreamRunning() )
         {
             m_response.init( 0, cmd::OK_STREAMING_RESPONSE );
         }
@@ -103,12 +110,12 @@ public:
         {
             m_response.init( 0, cmd::IS_NOT_STARTED_RESPONSE );
         }
-         
+
         m_tcpSession->asyncWrite( m_response, [this]
         {
             if ( m_tcpSession->hasError() )
             {
-                LOG_ERR( "ViewerSession asyncWrite error: " << m_tcpSession->errorMassage() << std::endl );
+                LOG_ERR( "ViewerSession asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
                 m_tcpSession->closeSession();
                 return;
             }
@@ -122,7 +129,7 @@ public:
         {
             if ( m_tcpSession->hasError() )
             {
-                LOG_ERR( "sendStreamingData:asyncWrite error: " << m_tcpSession->errorMassage() << std::endl );
+                LOG_ERR( "sendStreamingData:asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
                 m_tcpSession->closeSession();
             }
         });
@@ -134,7 +141,7 @@ public:
 //
 // StreamerSession
 //
-class StreamerSession : public IStreamerSession, std::enable_shared_from_this<StreamerSession>
+class StreamerSession : public IStreamerSession
 {
     typedef std::shared_ptr<ViewerSession> ViewerSessionPtr;
 
@@ -148,15 +155,14 @@ class StreamerSession : public IStreamerSession, std::enable_shared_from_this<St
     StreamingTpkt                       m_streamDataResponse;
 
     std::set<ViewerSessionPtr>          m_viewers;
-    std::mutex                          m_mutex;
+    std::mutex                          m_viewersMutex;
 
     EndSessionHandler                   m_endSessionHandler;
 
 public:
 
-    StreamerSession( StreamId& streamId, std::shared_ptr<IAsyncTcpSession> session, EndSessionHandler endSessionHandler )
+    StreamerSession( StreamId& streamId, EndSessionHandler endSessionHandler )
         : m_streamId(streamId),
-          m_tcpSession(session),
           m_endSessionHandler(endSessionHandler)
     {
         LOG( "StreamerSession: " << m_streamId.m_id << std::endl );
@@ -165,24 +171,53 @@ public:
     ~StreamerSession()
     {
         LOG( "~StreamerSession: " << m_streamId.m_id << std::endl );
-        if ( m_tcpSession != nullptr )
+        if ( m_tcpSession )
             m_tcpSession->closeSession();
     }
-
-    bool isLiveStreamRunning() override { return m_tcpSession != nullptr; }
-
-    void addViewer( std::shared_ptr<IAsyncTcpSession> viewerTcpSession )
+    
+    void startSession( std::shared_ptr<IAsyncTcpSession> tcpSession ) override
     {
-        const std::lock_guard<std::mutex> autolock( m_mutex );
-        auto viewerSession = std::make_shared<ViewerSession>( viewerTcpSession, *this );
-        m_viewers.insert( viewerSession );
+        m_tcpSession = tcpSession;
+        if ( m_tcpSession )
+        {
+            sendOkStreamingResponse();
+        }
+        else
+        {
+            LOG_ERR( "internal error" );
+            sendErrorResponse( "StreamerSession::startSession: internal error" );
+        }
+    }
+
+    bool isLiveStreamRunning() override { return m_tcpSession ? true : false; }
+
+    void addViewer( std::shared_ptr<IAsyncTcpSession> viewerTcpSession ) override
+    {
+        auto viewerSession = std::make_shared<ViewerSession>( viewerTcpSession, std::weak_ptr<IStreamerSession>( shared_from_this() ) );
+        {
+            const std::lock_guard<std::mutex> autolock( m_viewersMutex );
+            m_viewers.insert( viewerSession );
+        }
         viewerSession->sendResponse();
     }
 
-    void removeViewerSession( ViewerSession* viewerSession ) override
+    void removeViewer( std::shared_ptr<ViewerSession> viewerSession ) override
     {
-        viewerSession->m_tcpSession->closeSession();
-        m_viewers.erase( viewerSession->shared_from_this() );
+        auto it = m_viewers.find( viewerSession );
+        if ( it == m_viewers.end() )
+        {
+            LOG_ERR( "removeViewer: internal error")
+        }
+        else
+        {
+            std::shared_ptr<ViewerSession> shared = *it;
+            {
+                const std::lock_guard<std::mutex> autolock( m_viewersMutex );
+                m_viewers.erase( it );
+            }
+            // when shared will be deleted it will call closeSession,
+            // so it shoul de out of lock
+        }
     }
 
     void sendOkStreamingResponse()
@@ -190,10 +225,11 @@ public:
         m_response.init( 0, cmd::OK_STREAMING_RESPONSE );
         m_tcpSession->asyncWrite( m_response, [this]
         {
-            if ( m_tcpSession->hasError() )
+            if ( m_tcpSession && m_tcpSession->hasError() )
             {
-                LOG_ERR( "asyncWrite error: " << m_tcpSession->errorMassage() << std::endl );
+                LOG_ERR( "asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
                 m_tcpSession->closeSession();
+                m_tcpSession = nullptr;
                 return;
             }
             readNextClientRequest();
@@ -205,9 +241,9 @@ public:
         m_response.init( 0, cmd::ERROR_STREAMING_RESPONSE, errorText );
         m_tcpSession->asyncWrite( m_response, [this]
         {
-            if ( m_tcpSession->hasError() )
+            if ( m_tcpSession && m_tcpSession->hasError() )
             {
-                LOG_ERR( "asyncWrite error: " << m_tcpSession->errorMassage() << std::endl );
+                LOG_ERR( "asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
                 m_tcpSession->closeSession();
                 m_tcpSession = nullptr;
                 return;
@@ -220,11 +256,11 @@ public:
     {
         m_tcpSession->asyncRead( [this]()
         {
-            if ( m_tcpSession->hasError() )
+            if ( m_tcpSession && m_tcpSession->hasError() )
             {
                 if ( !m_tcpSession->isEof() )
                 {
-                    LOG_ERR( "StreamerSession asyncRead error: " << m_tcpSession->errorMassage() << std::endl );
+                    LOG_ERR( "StreamerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
                 }
 
                 //TODO ?sendErrorResponse?
@@ -314,10 +350,10 @@ public:
 //
 class StreamManager : protected IStreamManager
 {
-    std::unique_ptr<IAsyncTcpServer>                    m_tcpServer;
+    std::shared_ptr<IAsyncTcpServer>                     m_tcpServer;
 
-    std::map<StreamId,std::shared_ptr<StreamerSession>> m_liveStreamMap;
-    std::mutex                                          m_mapMutex;
+    std::map<StreamId,std::shared_ptr<IStreamerSession>> m_liveStreamMap;
+    std::mutex                                           m_liveStreamMutex;
 
 
 public:
@@ -334,6 +370,7 @@ public:
             std::bind( &StreamManager::handleNewStreamSession, this, std::placeholders::_1 )
         );
         m_tcpServer->start( port );
+        errorText = "";
     }
 
     void stopStreamManager() override
@@ -352,7 +389,7 @@ public:
             // handle error
             if ( newSession->hasError() )
             {
-                LOG_ERR( "StreamManager asyncRead error: " << newSession->errorMassage() << std::endl );
+                LOG_ERR( "StreamManager asyncRead error: " << newSession->errorMessage() << std::endl );
                 newSession->closeSession();
                 return;
             }
@@ -424,16 +461,15 @@ public:
 
     void handleStartStreaming( StreamId& streamId, std::shared_ptr<IAsyncTcpSession> tcpSession )
     {
-        const std::lock_guard<std::mutex> autolock( m_mapMutex );
+        const std::lock_guard<std::mutex> autolock( m_liveStreamMutex );
 
         auto stream = m_liveStreamMap.find( streamId );
         if ( stream != m_liveStreamMap.end() )
         {
             // Have some viewers connected before?
-            if ( stream->second->m_tcpSession == nullptr )
+            if ( !stream->second->isLiveStreamRunning() )
             {
-                stream->second->m_tcpSession = tcpSession;
-                stream->second->sendOkStreamingResponse();
+                stream->second->startSession( tcpSession );
                 return;
             }
             //TODO restore connection to started session
@@ -443,25 +479,23 @@ public:
 
         // Start/add session
         EndSessionHandler handler = std::bind( &StreamManager::handleEndStreamingSession, this, std::placeholders::_1);
-        auto session = std::make_shared<StreamerSession>( streamId, tcpSession, handler );
+        std::shared_ptr<IStreamerSession> session = std::make_shared<StreamerSession>( streamId, handler );
         m_liveStreamMap[ streamId ] = session;
-        session->sendOkStreamingResponse();
+        session->startSession( tcpSession );
     }
 
     void handleEndStreamingSession( StreamId& streamId )
     {
-        auto& session = m_liveStreamMap[streamId];
-        //TODO mutex
         std::thread( [=] { m_liveStreamMap.erase( streamId ); } ).detach();
     }
 
     void handleViewerConnection( StreamId& streamId, std::shared_ptr<IAsyncTcpSession> tcpSession )
     {
-        std::shared_ptr<StreamerSession> session;
+        std::shared_ptr<IStreamerSession> session;
 
         // get streaming session
         {
-            const std::lock_guard<std::mutex> autolock( m_mapMutex );
+            const std::lock_guard<std::mutex> autolock( m_liveStreamMutex );
 
             auto it = m_liveStreamMap.find( streamId );
             if ( it != m_liveStreamMap.end() )
@@ -471,7 +505,7 @@ public:
             else
             {
                 EndSessionHandler handler = std::bind( &StreamManager::handleEndStreamingSession, this, std::placeholders::_1);
-                session = std::make_shared<StreamerSession>( streamId, nullptr, handler );
+                session = std::make_shared<StreamerSession>( streamId, handler );
                 m_liveStreamMap[ streamId ] = session;
             }
         }

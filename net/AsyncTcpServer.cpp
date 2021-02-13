@@ -151,7 +151,7 @@ protected:
         m_protocolError.emplace( errorText );
     }
 
-    std::string errorMassage() const    override
+    std::string errorMessage() const    override
     {
         if ( m_protocolError.has_value() )
             return m_protocolError.value();
