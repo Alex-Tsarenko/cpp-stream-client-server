@@ -23,7 +23,7 @@ namespace net {
         
         uint32_t uint32() const
         {
-            return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+            return (bytes[0]) | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
         }
     };
 
@@ -54,7 +54,7 @@ namespace net {
             m_buffer[0] = len         & 0xFF;
             m_buffer[1] = (len >>  8) & 0xFF;
             m_buffer[2] = (len >> 16) & 0xFF;
-            m_buffer[3] = (len >> 14) & 0xFF;
+            m_buffer[3] = (len >> 24) & 0xFF;
         }
 
         // writeUint32
