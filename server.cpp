@@ -18,7 +18,7 @@ using namespace catapult::streaming;
 int main(int, const char * [])
 {
     std::string errorText;
-    gStreamManager().startStreamManager( 15001, errorText );
+    gStreamManager().startStreamManager( 15001, 1, errorText );
 
     return 0;
 }

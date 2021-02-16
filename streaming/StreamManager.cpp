@@ -367,12 +367,12 @@ public:
 
     virtual ~StreamManager() {}
 
-    void startStreamManager( uint32_t port, std::string& errorText ) override
+    void startStreamManager( uint32_t port, uint threadNumber, std::string& errorText ) override
     {
         m_tcpServer = createAsyncTcpServer(
             std::bind( &StreamManager::handleNewStreamSession, this, std::placeholders::_1 )
         );
-        m_tcpServer->start( port );
+        m_tcpServer->start( port, threadNumber );
         errorText = "";
     }
 

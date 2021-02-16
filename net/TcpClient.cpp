@@ -62,7 +62,7 @@ public:
     {
         packet.updatePacketLenght();
         boost::system::error_code ec;
-        //LOG( "write: packetLen=" << packet.lenght() << std::endl );
+        LOG( "write: packetLen=" << packet.lenght() << std::endl );
         boost::asio::write( m_socket, boost::asio::buffer( packet.ptr(), packet.lenght() ),
                            asio::transfer_exactly( packet.lenght() ),
                            ec );

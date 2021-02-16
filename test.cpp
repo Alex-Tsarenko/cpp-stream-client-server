@@ -194,7 +194,7 @@ int main(int, const char * [])
     std::thread t( []
     {
         std::string errorText;
-        gStreamManager().startStreamManager( PORT, errorText );
+        gStreamManager().startStreamManager( PORT, 1, errorText );
     });
 
     std::thread s1( [] { runStreamer("Streamer1"); } );

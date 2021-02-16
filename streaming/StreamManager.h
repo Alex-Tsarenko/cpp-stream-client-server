@@ -24,7 +24,7 @@ namespace net {
     public:
         virtual ~IStreamManager() {}
 
-        virtual void startStreamManager( uint32_t port, std::string& errorText ) = 0;
+        virtual void startStreamManager( uint32_t port, uint threadNumber, std::string& errorText ) = 0;
         virtual void stopStreamManager() = 0;
 
         //virtual void startStreamingSession( IAsyncTcpSession* session, std::shared_ptr<ServerRequest> request ) = 0;

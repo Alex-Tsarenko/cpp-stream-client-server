@@ -29,7 +29,7 @@ namespace net      {
     class IAsyncTcpServer
     {
     public:
-        virtual void start( uint32_t port ) = 0;
+        virtual void start( uint32_t port, uint threadNumber ) = 0;
         virtual void stop() = 0;
 
         virtual ~IAsyncTcpServer() {}

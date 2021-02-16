@@ -3,10 +3,11 @@
 #include "Tpkt.h"
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/cstdint.hpp>
 #include <boost/enable_shared_from_this.hpp>
+
+//#include <boost/bind.hpp>
+//#include <boost/shared_ptr.hpp>
+//#include <boost/cstdint.hpp>
 
 namespace asio = boost::asio;
 using     tcp  = boost::asio::ip::tcp;
@@ -96,7 +97,7 @@ protected:
                 }
 
                 uint32_t packetLen = m_packetLen.uint32();
-                //LOG( "asyncRead: packetLen: " << packetLen << std::endl );
+                LOG( "asyncRead: packetLen: " << packetLen << std::endl );
 
                 if ( packetLen < 8 )
                 {
@@ -167,6 +168,8 @@ class AsyncTcpServer : public IAsyncTcpServer
     boost::asio::io_context         m_context;
     std::unique_ptr<tcp::acceptor>  m_acceptor;
 
+    std::vector<std::thread>        m_threads;
+
     NewSessionHandler               m_newSessionHandler;
 
 public:
@@ -177,19 +180,25 @@ public:
     {}
 
     // start
-    void start( uint32_t port ) override
+    void start( uint32_t port, uint threadNumber ) override
     {
         m_acceptor = std::unique_ptr<tcp::acceptor>( new tcp::acceptor( m_context, tcp::endpoint( tcp::v4(), port )) );
 
         startAccept();
+
+        for( uint i=0; i<threadNumber; i++ )
+        {
+            m_threads.emplace_back( [this] { run(); } );
+        }
 
         run();
     }
 
     void run()
     {
+        LOG( "Run started: " << std::this_thread::get_id() << std::endl );
         m_context.run();
-        LOG( "Run ended" << std::endl );
+        LOG( "Run ended" << std::this_thread::get_id() << std::endl );
     }
 
     // stop
@@ -197,6 +206,11 @@ public:
     {
         m_acceptor->close();
         m_context.stop();
+
+        for( auto& thread: m_threads )
+        {
+            thread.join();
+        }
     }
 
     // startAccept
