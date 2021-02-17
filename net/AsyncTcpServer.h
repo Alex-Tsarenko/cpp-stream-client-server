@@ -15,9 +15,12 @@ namespace net      {
         //virtual void asyncWrite( std::vector<uint8_t>&& response, std::function<void()> func ) = 0;
 
         virtual TpktRcv&    request() = 0;
-        virtual bool        hasError()      const = 0;
-        virtual bool        isEof()         const = 0;
-        virtual std::string errorMessage()  const = 0;
+        virtual bool        isEof()              const = 0;
+        virtual bool        hasReadError()       const = 0;
+        virtual std::string readErrorMessage()   const = 0;
+        virtual bool        hasWriteError()      const = 0;
+        virtual std::string writeErrorMessage()  const = 0;
+
 
         virtual void closeSession() = 0;
 

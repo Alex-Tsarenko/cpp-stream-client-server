@@ -77,22 +77,24 @@ public:
     {
         m_tcpSession->asyncRead( [this]()
         {
-            if ( m_tcpSession->hasError() && !m_isStopping )
+            if ( m_tcpSession->hasReadError() && !m_isStopping )
             {
                 if ( !m_tcpSession->isEof() )
                 {
-                    LOG_ERR( "ViewerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
+                    LOG_ERR( "ViewerSession asyncRead error: " << m_tcpSession->readErrorMessage() << std::endl );
+
+                    StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->readErrorMessage() );
+                    m_tcpSession->asyncWrite( response, [] {} );
                 }
 
-                StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->errorMessage() );
                 if ( auto shared = m_streamerSession.lock(); shared )
                 {
                     shared->removeViewer( shared_from_this() );
                 }
-                //TODO remove(this);
                 return;
             }
-            //TODO
+
+            //TODO handle viewer response
 
 //            try {
 
@@ -123,9 +125,9 @@ public:
 
         m_tcpSession->asyncWrite( m_response, [this]
         {
-            if ( m_tcpSession->hasError() && !m_isStopping )
+            if ( m_tcpSession->hasWriteError() && !m_isStopping )
             {
-                LOG_ERR( "ViewerSession asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
+                LOG_ERR( "ViewerSession asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
                 m_tcpSession->closeSession();
                 return;
             }
@@ -137,9 +139,9 @@ public:
     {
         m_tcpSession->asyncWrite( packet, [this]
         {
-            if ( m_tcpSession->hasError() )
+            if ( m_tcpSession->hasWriteError() && !m_isStopping )
             {
-                LOG_ERR( "sendStreamingData:asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
+                LOG_ERR( "sendStreamingData:asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
                 m_tcpSession->closeSession();
             }
         });
@@ -242,9 +244,9 @@ public:
         m_response.init( 0, cmd::OK_STREAMING_RESPONSE );
         m_tcpSession->asyncWrite( m_response, [this]
         {
-            if ( m_tcpSession && m_tcpSession->hasError() )
+            if ( m_tcpSession && m_tcpSession->hasWriteError() )
             {
-                LOG_ERR( "asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
+                LOG_ERR( "asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
                 m_tcpSession->closeSession();
                 m_tcpSession = nullptr;
                 return;
@@ -258,9 +260,9 @@ public:
         m_response.init( 0, cmd::ERROR_STREAMING_RESPONSE, errorText );
         m_tcpSession->asyncWrite( m_response, [this]
         {
-            if ( m_tcpSession && m_tcpSession->hasError() )
+            if ( m_tcpSession && m_tcpSession->hasWriteError() )
             {
-                LOG_ERR( "asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
+                LOG_ERR( "asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
                 m_tcpSession->closeSession();
                 m_tcpSession = nullptr;
                 return;
@@ -273,14 +275,16 @@ public:
     {
         m_tcpSession->asyncRead( [this]()
         {
-            if ( m_tcpSession && m_tcpSession->hasError() )
+            if ( m_tcpSession && m_tcpSession->hasReadError() )
             {
                 if ( !m_tcpSession->isEof() && !m_isStopping )
                 {
-                    LOG_ERR( "StreamerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
+                    LOG_ERR( "StreamerSession asyncRead error: " << m_tcpSession->readErrorMessage() << std::endl );
+
+                    StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->readErrorMessage() );
+                    m_tcpSession->asyncWrite( response, [] {} );
                 }
 
-                //TODO ?sendErrorResponse?
                 m_tcpSession->closeSession();
                 return;
             }
@@ -324,7 +328,10 @@ public:
                             }
                             else
                             {
-                                //TODO send error message
+                                LOG_ERR( "StreamerSession asyncRead error: dataLen=" << dataLen << std::endl );
+
+                                StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, "invalid streaming data lenngth" );
+                                m_tcpSession->asyncWrite( response, [] {} );
                             }
                         }
                         sendOkStreamingResponse();
@@ -415,10 +422,11 @@ public:
         newSession->asyncRead( [newSession,this]()
         {
             // handle error
-            if ( newSession->hasError() )
+            if ( newSession->hasReadError() )
             {
-                LOG_ERR( "StreamManager asyncRead error: " << newSession->errorMessage() << std::endl );
-                newSession->closeSession();
+                LOG_ERR( "StreamManager asyncRead error: " << newSession->readErrorMessage() << std::endl );
+                StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, newSession->readErrorMessage() );
+                newSession->asyncWrite( response, [newSession] { newSession->closeSession(); } );
                 return;
             }
 
@@ -503,7 +511,7 @@ public:
                 return;
             }
 
-            //TODO send error message "session already running"
+            //TODO  ? for demo: reconnect or send error message "session already running"
             //tcpSession->asyncWrite(...)
 
             return;

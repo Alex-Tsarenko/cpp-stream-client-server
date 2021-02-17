@@ -26,8 +26,10 @@ private:
     TpktLen         m_packetLen;
     TpktRcv          m_request;
 
-    boost::system::error_code   m_lastErrorCode;
-    std::optional<std::string>  m_protocolError;
+    boost::system::error_code   m_lastReadError;
+    std::optional<std::string>  m_readProtocolError;
+
+    boost::system::error_code   m_lastWriteError;
 
 public:
     AsyncTcpSession( tcp::socket&& socket ) : m_socket( std::move(socket) )
@@ -43,8 +45,9 @@ public:
     tcp::socket&  socket() { return m_socket; }
 
     TpktRcv&    request()               override { return m_request; }
-    bool        hasError() const        override { return (m_lastErrorCode || m_protocolError.has_value()) ? true : false; }
-    bool        isEof()    const        override { return m_lastErrorCode == make_error_code(boost::asio::error::eof); }
+    bool        hasReadError() const    override { return (m_lastReadError || m_readProtocolError.has_value()) ? true : false; }
+    bool        hasWriteError() const   override { return (m_lastWriteError) ? true : false; }
+    bool        isEof()    const        override { return m_lastReadError == make_error_code(boost::asio::error::eof); }
 
 protected:
 
@@ -60,7 +63,7 @@ protected:
         {
             if ( auto shared = weak.lock(); shared )
             {
-                m_lastErrorCode = ec;
+                m_lastWriteError = ec;
                 if ( ec )
                 {
                     logSocketError();
@@ -82,7 +85,7 @@ protected:
         {
             if ( auto shared = weak.lock(); shared )
             {
-                m_lastErrorCode = ec;
+                m_lastReadError = ec;
                 if ( ec )
                 {
                     logSocketError();
@@ -117,7 +120,7 @@ protected:
                     if ( auto shared = weak.lock(); shared )
                     {
                         //m_request.print("server:");
-                        m_lastErrorCode = ec;
+                        m_lastReadError = ec;
                         if ( ec )
                         {
                             logSocketError();
@@ -151,15 +154,20 @@ protected:
 
     void handleProtocolError( const char* errorText )
     {
-        m_protocolError.emplace( errorText );
+        m_readProtocolError.emplace( errorText );
     }
 
-    std::string errorMessage() const    override
+    std::string readErrorMessage() const    override
     {
-        if ( m_protocolError.has_value() )
-            return m_protocolError.value();
+        if ( m_readProtocolError.has_value() )
+            return m_readProtocolError.value();
 
-        return m_lastErrorCode.message();
+        return m_lastReadError.message();
+    }
+    std::string writeErrorMessage() const    override
+    {
+
+        return m_lastWriteError.message();
     }
 };
 

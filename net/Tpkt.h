@@ -33,7 +33,7 @@ namespace net {
 
 
     //
-    // Tpkt - transport packet: { packetLenght, version, command, ... }
+    // Tpkt - transport packet: { packetLenght, data ... }
     //
     class Tpkt
     {

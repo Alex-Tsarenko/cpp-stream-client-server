@@ -67,12 +67,12 @@ void runStreamer( std::string streamerId )
         }
 
         LOG( "# " << streamerId << " streaming started" << std::endl );
-        for( int i=0; i<2 ; i++ )
+        for( int i=0; i<20 ; i++ )
         {
-            usleep(100000);
+            //usleep(100000);
 
             // 4) prepare adio/video data
-            uint32_t dataLen = 20000+i;
+            uint32_t dataLen = 2000*1000+i;
             std::unique_ptr<uint8_t[]> buffer( new uint8_t[dataLen] );
             memset(buffer.get()+1, 0xee, dataLen-2 );
             buffer[0] = 0xaa;
