@@ -1,6 +1,10 @@
 #pragma once
 #include <vector>
 
+//#ifdef DEBUG
+//#include <iomanip>
+//#endif
+
 #include "Streaming.h"
 
 namespace catapult {
@@ -75,6 +79,26 @@ namespace net {
                 m_buffer.insert( m_buffer.end(), bytes, bytes+len );
             }
         }
+        
+        void append( const uint8_t* bytes, uint32_t len )
+        {
+            if ( len > 0 )
+            {
+                m_buffer.insert( m_buffer.end(), bytes, bytes+len );
+            }
+        }
+        
+//#ifdef DEBUG
+//        void print( std::string title )
+//        {
+//            std::cout << title;
+//            for( auto& it : m_buffer )
+//            {
+//                std::cout << std::hex << uint(it) << " ";
+//            }
+//            std::cout << std::endl;
+//        }
+//#endif
 
         size_t          lenght()      const { return m_buffer.size(); }
         const uint8_t*  ptr()         const { return &m_buffer[0]; }
@@ -125,6 +149,18 @@ namespace net {
 
             return true;
         }
+
+//#ifdef DEBUG
+//        void print( std::string title )
+//        {
+//            std::cout << title;
+//            for( auto it = m_readPosition; it!=m_endPosition; it++ )
+//            {
+//                std::cout << std::hex << uint(*it) << " ";
+//            }
+//            std::cout << std::endl;
+//        }
+//#endif
     };
 
 

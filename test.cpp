@@ -6,6 +6,12 @@
 #include "StreamClient.h"
 #include "StreamManager.h"
 
+inline std::mutex sLogMutex;
+#define _LOG(expr) { \
+        const std::lock_guard<std::mutex> autolock( sLogMutex ); \
+        std::cerr << expr << std::endl << std::flush; \
+    }
+
 using namespace catapult::net;
 using namespace catapult::streaming;
 
@@ -49,16 +55,16 @@ void runStreamer( std::string streamerId )
             {
                 std::string errorText;
                 response.read( errorText );
-                LOG( "# " << streamerId << ": ERROR_STREAMING_RESPONSE - " << errorText << std::endl );
+                _LOG( "# " << streamerId << ": ERROR_STREAMING_RESPONSE - " << errorText << std::endl );
             }
             else
             {
-                LOG( "# " << streamerId << ": responseId != cmd::OK_STREAMING_RESPONSE - " << cmd::name(responseId) << std::endl );
+                _LOG( "# " << streamerId << ": responseId != cmd::OK_STREAMING_RESPONSE - " << cmd::name(responseId) << std::endl );
             }
             return;
         }
 
-        LOG( "# " << streamerId << " streaming started" << std::endl );
+        _LOG( "# " << streamerId << " streaming started" << std::endl );
         for( int i=0; i<2 ; i++ )
         {
             usleep(100000);
@@ -75,7 +81,7 @@ void runStreamer( std::string streamerId )
             // 5) send adio/video data
             if ( !tcpClient->write(pkt) )
                 throw std::runtime_error( tcpClient->errorMessage() );
-            LOG( "# " << streamerId << ": data sent; len=" << dataLen << std::endl );
+            _LOG( "# " << streamerId << ": data sent; len=" << dataLen << std::endl );
 
             // 6) get response
             if ( !tcpClient->read( (TpktRcv&)response ) )
@@ -90,7 +96,7 @@ void runStreamer( std::string streamerId )
             // 7) check response
             if ( responseId != cmd::OK_STREAMING_RESPONSE )
             {
-                LOG( "# " << streamerId << ": streaming error; responseId != cmd::OK_STREAMING_RESPONSE - " << cmd::name(responseId) << std::endl );
+                _LOG( "# " << streamerId << ": streaming error; responseId != cmd::OK_STREAMING_RESPONSE - " << cmd::name(responseId) << std::endl );
                 return;
             }
         }
@@ -103,7 +109,7 @@ void runStreamer( std::string streamerId )
     }
     catch ( std::runtime_error error )
     {
-        LOG( "# " << streamerId << ": socket error: " << error.what() << std::endl );
+        _LOG( "# " << streamerId << ": socket error: " << error.what() << std::endl );
     }
 }
 
@@ -135,19 +141,19 @@ void runViewer( std::string viewerId )
         // 3) check response
         if ( responseId == cmd::OK_STREAMING_RESPONSE )
         {
-            LOG( "# " << viewerId << ": responseId = " << cmd::name(responseId) << std::endl );
+            _LOG( "# " << viewerId << ": responseId = " << cmd::name(responseId) << std::endl );
         }
         else if ( responseId == cmd::IS_NOT_STARTED_RESPONSE )
         {
-            LOG( "# " << viewerId << ": responseId = " << cmd::name(responseId) << std::endl );
+            _LOG( "# " << viewerId << ": responseId = " << cmd::name(responseId) << std::endl );
         }
         else
         {
-            LOG( "# " << viewerId << ": responseId = " << cmd::name(responseId) << std::endl );
+            _LOG( "# " << viewerId << ": responseId = " << cmd::name(responseId) << std::endl );
             return;
         }
 
-        LOG( "# " << viewerId << ": viewinging started" << std::endl );
+        _LOG( "# " << viewerId << ": viewinging started" << std::endl );
         for(;;)
         {
             // 4) get audio/video data
@@ -163,14 +169,14 @@ void runViewer( std::string viewerId )
             // 5) check response id
             if ( responseId != cmd::STREAMING_DATA )
             {
-                LOG( "# " << viewerId << ": viewing error; responseId != cmd::STREAMING_DATA - " << cmd::name(responseId) << std::endl );
+                _LOG( "# " << viewerId << ": viewing error; responseId != cmd::STREAMING_DATA - " << cmd::name(responseId) << std::endl );
                 return;
             }
 
             // get data len
             uint32_t dataLen;
             response.read(dataLen);
-            LOG( "# " << viewerId << ": data received; dataLen=" << dataLen << std::endl );
+            _LOG( "# " << viewerId << ": data received; dataLen=" << dataLen << std::endl );
 
             // read data
             std::unique_ptr<uint8_t[]> data( new uint8_t[dataLen] );
@@ -185,7 +191,7 @@ void runViewer( std::string viewerId )
     }
     catch ( std::runtime_error error )
     {
-        LOG( "# " << viewerId << ": socket error" << error.what()  << std::endl );
+        _LOG( "# " << viewerId << ": socket error" << error.what()  << std::endl );
     }
 }
 

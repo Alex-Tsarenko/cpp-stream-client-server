@@ -6,6 +6,13 @@
 #include "StreamClient.h"
 #include "StreamManager.h"
 
+inline std::mutex sLogMutex;
+#define _LOG(expr) { \
+        const std::lock_guard<std::mutex> autolock( sLogMutex ); \
+        std::cerr << expr << std::endl << std::flush; \
+    }
+
+
 using namespace catapult::net;
 using namespace catapult::streaming;
 
@@ -29,7 +36,8 @@ void runStreamer( std::string streamerId )
         if ( !tcpClient->write(pkt) )
             throw std::runtime_error( tcpClient->errorMessage() );
 
-        usleep(1000000);
+        //usleep(1000*1000);
+        usleep(10);
 
         // 2) get response
         StreamingTpktRcv response;
@@ -59,7 +67,7 @@ void runStreamer( std::string streamerId )
         }
 
         LOG( "# " << streamerId << " streaming started" << std::endl );
-        for( int i=0; i<200 ; i++ )
+        for( int i=0; i<2 ; i++ )
         {
             usleep(100000);
 
@@ -155,6 +163,8 @@ void runViewer( std::string viewerId )
             // 4) get audio/video data
             if ( !tcpClient->read( (TpktRcv&)response ) )
                 throw std::runtime_error( tcpClient->errorMessage() );
+            
+            //response.print("v:");
 
             // parse response
             uint32_t version;
@@ -174,11 +184,11 @@ void runViewer( std::string viewerId )
             response.read(i);
             if ( prevI == uint32_t(-1) )
             {
-                std::cout << viewerId << " first i="<< i << std::endl;
+                _LOG( viewerId << " first i="<< i << std::endl );
             }
             else if ( i > prevI+1 )
             {
-                std::cout << "### " << viewerId << " lost "<< i-prevI-1 << std::endl;
+                _LOG( "### " << viewerId << " lost "<< i-prevI-1 << std::endl );
             }
             prevI = i;
 
@@ -206,22 +216,31 @@ void runViewer( std::string viewerId )
 
 int main(int, const char * [])
 {
-    std::thread t( []
+    std::thread serverThread( []
     {
         std::string errorText;
-        gStreamManager().startStreamManager( PORT, 1, errorText );
+        gStreamManager().startStreamManager( PORT, 4, errorText );
     });
 
-    std::thread s1( [] { runStreamer("Streamer1"); } );
+    std::thread streamerThread( [] { runStreamer("Streamer1"); } );
 
-    std::thread v1( [] { runViewer("Viewer1"); } );
+    std::vector<std::thread> viewers;
+    for( int i=0; i<100; i++ )
+    {
+        viewers.emplace_back( [i] {
+            std::string name = std::string("Viewer_") + std::to_string(i);
+            runViewer( name );
+        });
+    }
 
-
-    s1.join();
-    v1.join();
+    streamerThread.join();
+    for( auto& viewer : viewers )
+    {
+        viewer.join();
+    }
 
     gStreamManager().stopStreamManager();
-    t.join();
+    serverThread.join();
 
     return 0;
 }

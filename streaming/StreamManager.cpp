@@ -35,7 +35,8 @@ public:
     virtual void removeViewer( std::shared_ptr<ViewerSession> ) = 0;
 
     virtual void sendErrorResponse( std::string errorText) = 0;
-
+    
+    virtual void prepareToStop() = 0;
 };
 
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -54,6 +55,8 @@ class ViewerSession: std::enable_shared_from_this<ViewerSession>
     std::weak_ptr<IStreamerSession>     m_streamerSession;
 
     StreamingTpkt                       m_response; //?
+    
+    bool                                m_isStopping = false;
 
 public:
 
@@ -65,6 +68,7 @@ public:
 
     ~ViewerSession()
     {
+        m_isStopping = true;
         if ( m_tcpSession )
             m_tcpSession->closeSession();
     }
@@ -73,9 +77,12 @@ public:
     {
         m_tcpSession->asyncRead( [this]()
         {
-            if ( m_tcpSession->hasError() )
+            if ( m_tcpSession->hasError() && !m_isStopping )
             {
-                LOG_ERR( "ViewerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
+                if ( !m_tcpSession->isEof() )
+                {
+                    LOG_ERR( "ViewerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
+                }
 
                 StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, m_tcpSession->errorMessage() );
                 if ( auto shared = m_streamerSession.lock(); shared )
@@ -116,7 +123,7 @@ public:
 
         m_tcpSession->asyncWrite( m_response, [this]
         {
-            if ( m_tcpSession->hasError() )
+            if ( m_tcpSession->hasError() && !m_isStopping )
             {
                 LOG_ERR( "ViewerSession asyncWrite error: " << m_tcpSession->errorMessage() << std::endl );
                 m_tcpSession->closeSession();
@@ -136,6 +143,11 @@ public:
                 m_tcpSession->closeSession();
             }
         });
+    }
+    
+    void prepareToStop()
+    {
+        m_isStopping = true;
     }
 };
 
@@ -161,6 +173,8 @@ class StreamerSession : public IStreamerSession
     std::mutex                          m_viewersMutex;
 
     EndSessionHandler                   m_endSessionHandler;
+    
+    bool                                m_isStopping = false;
 
 public:
 
@@ -261,7 +275,7 @@ public:
         {
             if ( m_tcpSession && m_tcpSession->hasError() )
             {
-                if ( !m_tcpSession->isEof() )
+                if ( !m_tcpSession->isEof() && !m_isStopping )
                 {
                     LOG_ERR( "StreamerSession asyncRead error: " << m_tcpSession->errorMessage() << std::endl );
                 }
@@ -305,7 +319,7 @@ public:
                             uint32_t dataLen = request.restDataLen();
                             if ( dataLen>4 )
                             {
-                                m_streamDataResponse.initWithStreamingData( 0, cmd::STREAMING_DATA, request.restDataPtr()+4, dataLen-4 );
+                                m_streamDataResponse.initWithStreamingData( 0, cmd::STREAMING_DATA, request.restDataPtr(), dataLen );
                                 sendStreamingDataToViewers();
                             }
                             else
@@ -344,6 +358,13 @@ public:
             (*it)->sendStreamingData( m_streamDataResponse );
         }
     }
+    
+    void prepareToStop() override
+    {
+        for( auto& it : m_viewers )
+            it->prepareToStop();
+        m_isStopping = true;
+    }
 };
 
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -378,6 +399,10 @@ public:
 
     void stopStreamManager() override
     {
+        for( auto it : m_liveStreamMap )
+        {
+            it.second->prepareToStop();
+        }
         LOG( "m_liveStreamMap.size()=" << m_liveStreamMap.size() << std::endl );
         m_tcpServer->stop();
         LOG( "stopStreamManager ended" << std::endl );

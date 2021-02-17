@@ -115,6 +115,7 @@ protected:
                 {
                     if ( auto shared = weak.lock(); shared )
                     {
+                        //m_request.print("server:");
                         m_lastErrorCode = ec;
                         if ( ec )
                         {
@@ -171,6 +172,8 @@ class AsyncTcpServer : public IAsyncTcpServer
     std::vector<std::thread>        m_threads;
 
     NewSessionHandler               m_newSessionHandler;
+    
+    bool                            m_isStopping = false;
 
 public:
 
@@ -204,6 +207,7 @@ public:
     // stop
     void stop() override
     {
+        m_isStopping = true;
         m_acceptor->close();
         m_context.stop();
 
@@ -224,7 +228,7 @@ public:
             {
                 m_newSessionHandler( newSession );
             }
-            else
+            else if ( !m_isStopping )
             {
                 LOG_ERR( "async_accept error: " << ec.message() << std::endl );
             }

@@ -101,14 +101,15 @@ namespace streaming {
             writeBytes( (uint8_t*)text.c_str(), (uint32_t)text.size() );
         }
         
-        void initWithStreamingData( uint32_t restDataLen, cmd::Id command, const uint8_t* ptr, uint32_t binDataLen )
+        // !!! binData MUST HAVE length field at the beginning of data
+        void initWithStreamingData( uint32_t restDataLen, cmd::Id command, const uint8_t* binData, uint32_t binDataLen )
         {
             m_buffer.erase( m_buffer.begin(), m_buffer.end() );
             m_buffer.reserve( restDataLen+4+binDataLen+12 );
             writeUint32( restDataLen+4+binDataLen+12 );
             writeUint32( PROTOCOL_VERSION );
             writeUint32( command );
-            writeBytes( ptr, binDataLen );
+            append( binData, binDataLen );
         }
 
         void write( const PublicKey& key )
