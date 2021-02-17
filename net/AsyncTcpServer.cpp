@@ -20,7 +20,6 @@ namespace net      {
 //
 class AsyncTcpSession : public IAsyncTcpSession
 {
-    friend class    AsyncTcpServer;
     tcp::socket     m_socket;
 
 private:
@@ -40,6 +39,8 @@ public:
     {
         LOG( "~TcpSession(" << this << ")" << std::endl );
     }
+
+    tcp::socket&  socket() { return m_socket; }
 
     TpktRcv&    request()               override { return m_request; }
     bool        hasError() const        override { return (m_lastErrorCode || m_protocolError.has_value()) ? true : false; }
@@ -221,7 +222,8 @@ public:
     void startAccept()
     {
         std::shared_ptr<IAsyncTcpSession> newSession = std::make_shared<AsyncTcpSession>( tcp::socket(m_context) );
-        m_acceptor->async_accept( ((AsyncTcpSession*)newSession.get())->m_socket,
+        
+        m_acceptor->async_accept( ((AsyncTcpSession*)newSession.get())->socket(),
                                  [newSession,this] ( const boost::system::error_code& ec )
         {
             if (!ec)
