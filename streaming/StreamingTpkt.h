@@ -105,8 +105,8 @@ namespace streaming {
         void initWithStreamingData( uint32_t restDataLen, cmd::Id command, const uint8_t* binData, uint32_t binDataLen )
         {
             m_buffer.erase( m_buffer.begin(), m_buffer.end() );
-            m_buffer.reserve( restDataLen+4+binDataLen+12 );
-            writeUint32( restDataLen+4+binDataLen+12 );
+            m_buffer.reserve( restDataLen+binDataLen+12 );
+            writeUint32( restDataLen+binDataLen+12 );
             writeUint32( PROTOCOL_VERSION );
             writeUint32( command );
             append( binData, binDataLen );

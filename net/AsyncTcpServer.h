@@ -12,7 +12,6 @@ namespace net      {
     public:
         virtual void asyncRead( std::function<void()> ) = 0;
         virtual void asyncWrite( Tpkt&, std::function<void()> ) = 0;
-        //virtual void asyncWrite( std::vector<uint8_t>&& response, std::function<void()> func ) = 0;
 
         virtual TpktRcv&    request() = 0;
         virtual bool        isEof()              const = 0;
@@ -21,6 +20,7 @@ namespace net      {
         virtual bool        hasWriteError()      const = 0;
         virtual std::string writeErrorMessage()  const = 0;
 
+        virtual void postOnStrand( std::function<void()> func ) = 0;
 
         virtual void closeSession() = 0;
 

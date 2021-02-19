@@ -20,11 +20,12 @@ namespace net      {
 //
 class AsyncTcpSession : public IAsyncTcpSession
 {
-    tcp::socket     m_socket;
+    tcp::socket                 m_socket;
+    asio::io_context::strand    m_strand;
 
 private:
-    TpktLen         m_packetLen;
-    TpktRcv          m_request;
+    TpktLen                     m_packetLen;
+    TpktRcv                     m_request;
 
     boost::system::error_code   m_lastReadError;
     std::optional<std::string>  m_readProtocolError;
@@ -32,7 +33,7 @@ private:
     boost::system::error_code   m_lastWriteError;
 
 public:
-    AsyncTcpSession( tcp::socket&& socket ) : m_socket( std::move(socket) )
+    AsyncTcpSession( asio::io_context& io_context ) : m_socket( io_context ), m_strand( io_context )
     {
         LOG( "TcpSession(" << this << ")" << std::endl );
     }
@@ -75,7 +76,7 @@ protected:
 
     void asyncRead( std::function<void()> func ) override
     {
-        LOG( "asyncRead(" << this << ")" << std::endl );
+        //LOG( "asyncRead(" << this << ")" << std::endl );
 
         // Get package lenght
         auto weak = std::weak_ptr<IAsyncTcpSession>( ((IAsyncTcpSession*)this)->shared_from_this() );
@@ -137,11 +138,11 @@ protected:
     {
         if ( isEof() )
         {
-            LOG( "AsyncTcpSession: client disconnected (" << m_lastErrorCode << " " << m_lastErrorCode.message() << ")" << std::endl );
+            LOG( "AsyncTcpSession: client disconnected (" << m_lastErrorCode.message() << ")" << std::endl );
         }
         else
         {
-            LOG( "AsyncTcpSession: read packageLen, socket error: " << m_lastErrorCode << " " << m_lastErrorCode.message() << std::endl );
+            LOG_WARN( "AsyncTcpSession: socket error: " << m_lastReadError.message() << " " << m_lastReadError.message() << std::endl );
         }
     }
 
@@ -168,6 +169,11 @@ protected:
     {
 
         return m_lastWriteError.message();
+    }
+
+    void postOnStrand( std::function<void()> func ) override
+    {
+        asio::post( m_strand, func );
     }
 };
 
@@ -202,8 +208,6 @@ public:
         {
             m_threads.emplace_back( [this] { run(); } );
         }
-
-        run();
     }
 
     void run()
@@ -229,7 +233,7 @@ public:
     // startAccept
     void startAccept()
     {
-        std::shared_ptr<IAsyncTcpSession> newSession = std::make_shared<AsyncTcpSession>( tcp::socket(m_context) );
+        std::shared_ptr<IAsyncTcpSession> newSession = std::make_shared<AsyncTcpSession>( m_context );
         
         m_acceptor->async_accept( ((AsyncTcpSession*)newSession.get())->socket(),
                                  [newSession,this] ( const boost::system::error_code& ec )
