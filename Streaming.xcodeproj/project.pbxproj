@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		FA884AF525DC7344002916E0 /* stressTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA884AED25DC62F5002916E0 /* stressTest.cpp */; };
+		FAB40EA725DF426700C83AC4 /* TcpClient2.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAB40EA625DF426700C83AC4 /* TcpClient2.cpp */; };
 		FAC1BE5025D2241A004C0384 /* StreamClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA9DACA325D2209C00E91C68 /* StreamClient.cpp */; };
 		FAC1BE5225D2241F004C0384 /* StreamManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA9DACA425D2209C00E91C68 /* StreamManager.cpp */; };
 		FAC1BE5425D2242F004C0384 /* AsyncTcpServer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA9DAC9925D2209100E91C68 /* AsyncTcpServer.cpp */; };
@@ -41,6 +42,7 @@
 		FA9DACA225D2209C00E91C68 /* StreamingTpkt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = StreamingTpkt.h; sourceTree = "<group>"; };
 		FA9DACA325D2209C00E91C68 /* StreamClient.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StreamClient.cpp; sourceTree = "<group>"; };
 		FA9DACA425D2209C00E91C68 /* StreamManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = StreamManager.cpp; sourceTree = "<group>"; };
+		FAB40EA625DF426700C83AC4 /* TcpClient2.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TcpClient2.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 				FA9DAC9A25D2209100E91C68 /* Tpkt.h */,
 				FA9DAC9D25D2209100E91C68 /* TcpClient.h */,
 				FA9DAC9B25D2209100E91C68 /* TcpClient.cpp */,
+				FAB40EA625DF426700C83AC4 /* TcpClient2.cpp */,
 				FA9DAC9C25D2209100E91C68 /* AsyncTcpServer.h */,
 				FA9DAC9925D2209100E91C68 /* AsyncTcpServer.cpp */,
 			);
@@ -155,6 +158,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FAC1BE5225D2241F004C0384 /* StreamManager.cpp in Sources */,
+				FAB40EA725DF426700C83AC4 /* TcpClient2.cpp in Sources */,
 				FAC1BE5025D2241A004C0384 /* StreamClient.cpp in Sources */,
 				FAC1BE5625D22436004C0384 /* TcpClient.cpp in Sources */,
 				FA884AF525DC7344002916E0 /* stressTest.cpp in Sources */,

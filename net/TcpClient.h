@@ -14,7 +14,9 @@ namespace net {
     public:
         virtual ~ITcpClient() {}
 
-        virtual bool        hasError() = 0;
+        virtual void setTimeout( int seconds ) = 0;
+
+        virtual bool hasError() = 0;
         virtual std::string errorMessage() = 0;
 
         virtual bool connect( const std::string& addr, const std::string& port ) = 0;
@@ -22,6 +24,9 @@ namespace net {
 
         virtual bool write( Tpkt& ) = 0;
         virtual bool read( TpktRcv& ) = 0;
+
+//        virtual bool writeChunk( streamId, timeMilisecods, audioVideoOffset, audioDuration, videoDuration, isKeyVideoFrame, data ) = 0;
+//        virtual bool readChuck( TpktRcv& ) = 0;
 
 //        virtual void startReadLoop( std::function<void(Tpkt&)> ) = 0;
     };
