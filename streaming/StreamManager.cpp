@@ -76,8 +76,12 @@ public:
 
     void readNextClientRequest()
     {
-        m_tcpSession->asyncRead( [this, self=shared_from_this()] ()
+        m_tcpSession->asyncRead( [this, weak=weak_from_this()]
         {
+            auto shared = weak.lock();
+            if ( !shared )
+                return;
+
             if ( m_tcpSession->hasReadError() && !m_isStopping )
             {
                 if ( !m_tcpSession->isEof() )
@@ -124,15 +128,18 @@ public:
             m_response.init( 0, cmd::IS_NOT_STARTED_RESPONSE );
         }
 
-        m_tcpSession->asyncWrite( m_response, [this]
+        m_tcpSession->asyncWrite( m_response, [this, weak=weak_from_this()]
         {
-            if ( m_tcpSession->hasWriteError() && !m_isStopping )
+            if ( auto shared = weak.lock(); shared )
             {
-                LOG_WARN( "ViewerSession asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
-                m_tcpSession->closeSession();
-                return;
+                if ( m_tcpSession->hasWriteError() && !m_isStopping )
+                {
+                    LOG_WARN( "ViewerSession asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
+                    m_tcpSession->closeSession();
+                    return;
+                }
+                readNextClientRequest();
             }
-            readNextClientRequest();
         });
     }
 
@@ -140,14 +147,17 @@ public:
     {
         if ( m_tcpSession.get() )
         {
-            m_tcpSession->asyncWrite( packet, [this]
+            m_tcpSession->asyncWrite( packet, [this, weak=weak_from_this()]
             {
-                if ( m_tcpSession->hasWriteError() && !m_isStopping )
+                if ( auto shared = weak.lock(); shared )
                 {
-                    LOG_WARN( "sendStreamingData:asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
-                    if ( auto shared = m_streamerSession.lock(); shared )
+                    if ( m_tcpSession->hasWriteError() && !m_isStopping )
                     {
-                        shared->removeViewer( shared_from_this() );
+                        LOG_WARN( "sendStreamingData:asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
+                        if ( auto shared = m_streamerSession.lock(); shared )
+                        {
+                            shared->removeViewer( shared_from_this() );
+                        }
                     }
                 }
             });
@@ -253,16 +263,19 @@ public:
     {
         m_response.init( 0, cmd::OK_STREAMING_RESPONSE );
 
-        m_tcpSession->asyncWrite( m_response, [this]
+        m_tcpSession->asyncWrite( m_response, [this, weak=weak_from_this()]
         {
-            if ( m_tcpSession && m_tcpSession->hasWriteError() )
+            if ( auto shared = weak.lock(); shared )
             {
-                LOG_WARN( "asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
-                m_tcpSession->closeSession();
-                m_tcpSession = nullptr;
-                return;
+                if ( m_tcpSession && m_tcpSession->hasWriteError() )
+                {
+                    LOG_WARN( "asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
+                    m_tcpSession->closeSession();
+                    m_tcpSession = nullptr;
+                    return;
+                }
+                readNextClientRequest();
             }
-            readNextClientRequest();
         });
     }
 
@@ -270,23 +283,30 @@ public:
     {
         m_response.init( 0, cmd::ERROR_STREAMING_RESPONSE, errorText );
 
-        m_tcpSession->asyncWrite( m_response, [this]
+        m_tcpSession->asyncWrite( m_response, [this, weak=weak_from_this()]
         {
-            if ( m_tcpSession && m_tcpSession->hasWriteError() )
+            if ( auto shared = weak.lock(); shared )
             {
-                LOG_WARN( "asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
-                m_tcpSession->closeSession();
-                m_tcpSession = nullptr;
-                return;
+                if ( m_tcpSession && m_tcpSession->hasWriteError() )
+                {
+                    LOG_WARN( "asyncWrite error: " << m_tcpSession->writeErrorMessage() << std::endl );
+                    m_tcpSession->closeSession();
+                    m_tcpSession = nullptr;
+                    return;
+                }
+                readNextClientRequest();
             }
-            readNextClientRequest();
         });
     }
 
     void readNextClientRequest()
     {
-        m_tcpSession->asyncRead( [this, self=shared_from_this()] ()
+        m_tcpSession->asyncRead( [this, weak=weak_from_this()]
         {
+            auto shared = weak.lock();
+            if ( !shared )
+                return;
+
             if ( m_tcpSession->hasReadError() )
             {
                 if ( !m_tcpSession->isEof() && !m_isStopping )
@@ -530,8 +550,8 @@ public:
             {
                 LOG_ERR( ": error:" << error.what() << std::endl );
                 StreamingTpkt response( 0, cmd::ERROR_STREAMING_RESPONSE, error.what() );
-                newSession->asyncWrite( response,
-                [newSession]
+
+                newSession->asyncWrite( response, [newSession]
                 {
                     newSession->closeSession();
                 });
