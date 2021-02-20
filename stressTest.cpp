@@ -66,7 +66,7 @@ void runStreamer( std::string streamerId )
         LOG( "# " << streamerId << " streaming started" << std::endl );
         auto t0 = std::chrono::high_resolution_clock::now();
 
-        for( int i=0; i<10 ; i++ )
+        for( int i=0; i<100; i++ )
         {
             usleep(10);
 
@@ -244,14 +244,16 @@ int main(int, const char * [])
 
     streamerThread.join();
 
-    gStreamManager().stopStreamManager();
-    serverThread.join();
+//    gStreamManager().stopStreamManager();
+//    serverThread.join();
 
     for( auto& viewer : viewers )
     {
         viewer.join();
     }
 
+    gStreamManager().stopStreamManager();
+    serverThread.join();
 
     return 0;
 }

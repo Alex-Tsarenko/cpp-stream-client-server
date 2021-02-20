@@ -142,7 +142,7 @@ protected:
         }
         else
         {
-            LOG_WARN( "AsyncTcpSession: socket error: " << m_lastReadError.message() << " " << m_lastReadError.message() << std::endl );
+            LOG( "AsyncTcpSession: socket error: " << m_lastReadError.message() << " " << m_lastReadError.message() << std::endl );
         }
     }
 
