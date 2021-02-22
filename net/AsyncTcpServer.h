@@ -7,11 +7,27 @@
 namespace catapult {
 namespace net      {
 
+    //
+    // IAsyncTcpSession - interface for AsyncTcpSession
+    //
     class IAsyncTcpSession:  public std::enable_shared_from_this<IAsyncTcpSession>
     {
     public:
-        virtual void asyncRead( std::function<void()> ) = 0;
-        virtual void asyncWrite( Tpkt&, std::function<void()> ) = 0;
+
+        //
+        // asyncRead - reads request, that will be available by calling 'request()'
+        //
+        // 'func' will be called after completed reading
+        // 'maxPacketLength' is used to prevent malicious attacks
+        //
+        virtual void asyncRead( std::function<void()> func, uint32_t maxPacketLength = 10*1024*1024 ) = 0;
+
+        //
+        // asyncWrite - writes response
+        //
+        // 'func' will be called after the write is completed
+        //
+        virtual void asyncWrite( Tpkt&, std::function<void()> func ) = 0;
 
         virtual TpktRcv&    request() = 0;
         virtual bool        isEof()              const = 0;
@@ -19,6 +35,8 @@ namespace net      {
         virtual std::string readErrorMessage()   const = 0;
         virtual bool        hasWriteError()      const = 0;
         virtual std::string writeErrorMessage()  const = 0;
+
+        virtual bool        received1stRequest() const = 0;
 
         virtual void postOnStrand( std::function<void()> func ) = 0;
 
@@ -29,6 +47,9 @@ namespace net      {
 
     typedef std::function< void(std::shared_ptr<IAsyncTcpSession>) > NewSessionHandler;
 
+    //
+    // IAsyncTcpServer - interface for AsyncTcpServer
+    //
     class IAsyncTcpServer
     {
     public:

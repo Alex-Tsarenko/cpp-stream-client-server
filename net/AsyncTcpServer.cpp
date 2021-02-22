@@ -32,6 +32,8 @@ private:
 
     boost::system::error_code   m_lastWriteError;
 
+    bool                        m_received1stRequest = false;
+
 public:
     AsyncTcpSession( asio::io_context& io_context ) : m_socket( io_context ), m_strand( io_context )
     {
@@ -74,7 +76,7 @@ protected:
         });
     }
 
-    void asyncRead( std::function<void()> func ) override
+    void asyncRead( std::function<void()> func, uint32_t maxPacketLength ) override
     {
         //LOG( "asyncRead(" << this << ")" << std::endl );
 
@@ -84,6 +86,8 @@ protected:
                           asio::transfer_exactly( 4 ),
                           [=]( boost::system::error_code ec, std::size_t bytesTransfered )
         {
+            m_received1stRequest = true;
+
             if ( auto shared = weak.lock(); shared )
             {
                 m_lastReadError = ec;
@@ -96,13 +100,20 @@ protected:
 
                 if ( bytesTransfered != 4 )
                 {
-                    handleProtocolError("invalid package lenght");
+                    handleProtocolError("invalid packet size");
                     func();
                     return;
                 }
 
                 uint32_t packetLen = m_packetLen.uint32();
                 LOG( "asyncRead: packetLen: " << packetLen << std::endl );
+
+                if ( packetLen > maxPacketLength )
+                {
+                    handleProtocolError( std::string("packet length exceeds ") + std::to_string(maxPacketLength) );
+                    func();
+                    return;
+                }
 
                 if ( packetLen < 8 )
                 {
@@ -153,7 +164,7 @@ protected:
     }
 
 
-    void handleProtocolError( const char* errorText )
+    void handleProtocolError( std::string errorText )
     {
         m_readProtocolError.emplace( errorText );
     }
@@ -170,6 +181,12 @@ protected:
 
         return m_lastWriteError.message();
     }
+
+    bool received1stRequest() const override
+    {
+        return m_received1stRequest;
+    }
+
 
     void postOnStrand( std::function<void()> func ) override
     {
@@ -240,6 +257,7 @@ public:
         {
             if (!ec)
             {
+                // handle new session
                 m_newSessionHandler( newSession );
             }
             else if ( !m_isStopping )

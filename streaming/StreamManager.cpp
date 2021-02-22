@@ -19,7 +19,7 @@ using namespace catapult::net;
 typedef std::function<void(StreamId&)>              EndSessionHandler;
 
 // StreamManager
-class Distributer;
+class Distributor;
 
 // ViewerSession
 class Viewer;
@@ -180,7 +180,7 @@ class LiveStream : public ILiveStream
     typedef std::shared_ptr<Viewer>  ViewerSessionPtr;
     typedef std::shared_ptr<StreamingTpkt>  StreamingTpktPtr;
 
-    friend class Distributer;
+    friend class Distributor;
     friend class Viewer;
 
     StreamId                            m_streamId;
@@ -438,27 +438,31 @@ public:
 //
 // Distributer
 //
-class Distributer : protected IDistributer
+class Distributor : protected IDistributor
 {
     std::shared_ptr<IAsyncTcpServer>                     m_tcpServer;
 
-    std::map<StreamId,std::shared_ptr<ILiveStream>> m_liveStreamMap;
+    std::map<StreamId,std::shared_ptr<ILiveStream>>      m_liveStreamMap;
     std::mutex                                           m_liveStreamMutex;
+
+    using SessionWPtr = std::weak_ptr<IAsyncTcpSession>;
+    std::queue<std::pair<std::time_t,SessionWPtr>>       m_newSessionQueue;
+    std::mutex                                           m_newSessionMutex;
 
     bool                                                 m_isStopping = false;
 
 public:
-    Distributer()
+    Distributor()
     {
 
     }
 
-    virtual ~Distributer() {}
+    virtual ~Distributor() {}
 
     void startStreamManager( uint32_t port, uint threadNumber, std::string& errorText ) override
     {
         m_tcpServer = createAsyncTcpServer(
-            std::bind( &Distributer::handleNewStreamSession, this, std::placeholders::_1 )
+            std::bind( &Distributor::handleNewStreamSession, this, std::placeholders::_1 )
         );
         m_tcpServer->start( port, threadNumber );
         errorText = "";
@@ -466,7 +470,7 @@ public:
 
     void stopStreamManager() override
     {
-        for( auto it : m_liveStreamMap )
+        for( auto& it : m_liveStreamMap )
         {
             it.second->prepareToStop();
         }
@@ -478,8 +482,35 @@ public:
 
     void handleNewStreamSession( std::shared_ptr<IAsyncTcpSession> newSession )
     {
-        //LOG( "handleNewStreamSession( TcpSession:" << newSession.get() << ")" << std::endl );
+        // prevent from malicious connections
+        {
+            const std::lock_guard<std::mutex> autolock( m_newSessionMutex );
 
+            while( m_newSessionQueue.size() > 0 )
+            {
+                std::time_t startTime = m_newSessionQueue.front().first;
+
+                // check that a response is not received within 60 seconds
+                if ( std::difftime( std::time(nullptr), startTime ) <= 60.0 ) // TODO make it as a parameter?
+                {
+                    break;
+                }
+                else
+                {
+                    auto session = m_newSessionQueue.front().second.lock();
+                    if ( session && !session->received1stRequest() )
+                    {
+                        // close malicious connection
+                        session->closeSession();
+                    }
+                    m_newSessionQueue.pop();
+                }
+            }
+            m_newSessionQueue.emplace( std::time(nullptr), newSession->weak_from_this() );
+            m_newSessionMutex.unlock();
+        }
+
+        // initiate reading of first request
         newSession->asyncRead( [newSession,this] ()
         {
             // handle error
@@ -582,7 +613,7 @@ public:
         }
 
         // Add session
-        EndSessionHandler handler = std::bind( &Distributer::handleEndStreamingSession, this, std::placeholders::_1);
+        EndSessionHandler handler = std::bind( &Distributor::handleEndStreamingSession, this, std::placeholders::_1);
         std::shared_ptr<ILiveStream> session = std::make_shared<LiveStream>( streamId, handler );
         m_liveStreamMap[ streamId ] = session;
         m_liveStreamMutex.unlock();
@@ -611,7 +642,7 @@ public:
             }
             else
             {
-                EndSessionHandler handler = std::bind( &Distributer::handleEndStreamingSession, this, std::placeholders::_1);
+                EndSessionHandler handler = std::bind( &Distributor::handleEndStreamingSession, this, std::placeholders::_1);
                 session = std::make_shared<LiveStream>( streamId, handler );
                 m_liveStreamMap[ streamId ] = session;
             }
@@ -622,11 +653,11 @@ public:
 };
 
 
-Distributer sStreamManager;
+Distributor sStreamManager;
 
-IDistributer& gStreamManager()
+IDistributor& gStreamManager()
 {
-    return  (IDistributer&)sStreamManager;
+    return  (IDistributor&)sStreamManager;
 }
 
 
