@@ -28,7 +28,7 @@ class Viewer;
 class ILiveStream: public std::enable_shared_from_this<ILiveStream>
 {
 public:
-    virtual ~ILiveStream() {}
+    virtual ~ILiveStream() = default;
 
     virtual void startSession( std::shared_ptr<IAsyncTcpSession> session ) = 0;
     virtual bool isLiveStreamRunning() = 0;
@@ -457,7 +457,7 @@ public:
 
     }
 
-    virtual ~Distributor() {}
+    virtual ~Distributor() {};
 
     void startStreamManager( uint32_t port, uint threadNumber, std::string& errorText ) override
     {

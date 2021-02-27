@@ -12,7 +12,7 @@ namespace streaming {
         IStreamClient() {};
 
     public:
-        virtual ~IStreamClient() {}
+        virtual ~IStreamClient() = default;
 
         virtual bool        hasError() = 0;
         virtual std::string errorMessage() = 0;

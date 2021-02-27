@@ -12,7 +12,7 @@ namespace net {
         ITcpClient() {}
 
     public:
-        virtual ~ITcpClient() {}
+        virtual ~ITcpClient() = default;
 
         virtual void setTimeout( int seconds ) = 0;
 

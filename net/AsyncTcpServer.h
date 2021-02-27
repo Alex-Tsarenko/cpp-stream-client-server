@@ -42,7 +42,7 @@ namespace net      {
 
         virtual void closeSession() = 0;
 
-        virtual ~IAsyncTcpSession() {}
+        virtual ~IAsyncTcpSession() = default;
     };
 
     typedef std::function< void(std::shared_ptr<IAsyncTcpSession>) > NewSessionHandler;
@@ -56,7 +56,7 @@ namespace net      {
         virtual void start( uint32_t port, uint threadNumber ) = 0;
         virtual void stop() = 0;
 
-        virtual ~IAsyncTcpServer() {}
+        virtual ~IAsyncTcpServer() = default;
     };
 
     std::unique_ptr<IAsyncTcpServer> createAsyncTcpServer( NewSessionHandler newSessionHandler );

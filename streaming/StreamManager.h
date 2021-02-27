@@ -15,7 +15,7 @@ namespace streaming {
     class IDistributor
     {
     public:
-        virtual ~IDistributor() {}
+        virtual ~IDistributor() = default;
 
         virtual void startStreamManager( uint32_t port, uint threadNumber, std::string& errorText ) = 0;
         virtual void stopStreamManager() = 0;
